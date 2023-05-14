@@ -55,6 +55,7 @@ class Tableau:
         constraints: values of the contraint column-vector (right-hand
         side). Must be size *m*.
         """
+
         # calculate reduced costs
         self.obj_func = obj_func
         obj_func = [-v for v in obj_func]
@@ -79,24 +80,24 @@ class Tableau:
         Returns string representation of tableau.
         """
 
-        # Suppress scientific notation and convert tableau to string
-        with np.printoptions(suppress=True):
-            # Convert tableau to string
-            top = np.arange(1, self.tab.shape[1] + 1)
-            top[-1] = -1  # Used as a placeholder
-            tab = np.r_[top[np.newaxis, :], self.tab]
-            rows = str(tab).split('\n')
+        # suppress scientific notation
+        np.set_printoptions(suppress=True)
 
-        # Strip off extra bracket off last row
+        # convert tableau to string
+        top = np.arange(1, self.tab.shape[1] + 1)
+        top[-1] = -1  # used as a placeholder
+        tab = np.r_[top[np.newaxis, :], self.tab]
+        rows = str(tab).split('\n')
+
+        # strip off extra bracket off last row
         rows[-1] = rows[-1][:-1]
 
-        # Top row with variables
+        # top row with variables
         top = "     " + rows[0].replace('.', 'x').replace('-1x', 'RHS')[2:-1]
 
-        # Add basis variables
+        # add basis variables
         return '\n'.join([top] + [f'{f"x{var + 1}" if var != "" else "z "} {row}'
                                   for row, var in zip(rows[1:], [''] + self.basis)])
-
 
     def __enter__(self):
         """ Enter method for context manager. Returns self."""
@@ -145,23 +146,18 @@ class Tableau:
         column.
         """
 
-        # Identity shifted over so top row is zeroes
+        # identity shifted over so top row is zeroes
         identity = np.identity(self.shape[0] + 1)[1:]
 
-        # Default basis has all -1's
+        # default basis has all -1's
         basis = np.full(self.shape[0], -1)
 
-        # Find matching columns in identity matrix and tableau
         for i, row in enumerate(identity):
-            matching_columns = np.all(self.tab.T == row, axis=1)
-            matching_indices = np.where(matching_columns)[0]
-
-            # Store index of the first matching column, if any
-            if matching_indices.size > 0:
-                basis[i] = matching_indices[0]
+            for j, col in enumerate(self.tab.T):
+                if np.all(row == col):
+                    basis[i] = j
 
         return list(basis)
-
 
     def pivot(self, use_blands_rule=False):
         """
@@ -178,62 +174,77 @@ class Tableau:
            If problem is unbounded.
         """
 
-        tab_0, tab_1, tab_minus1 = self.tab[0], self.tab[1:], self.tab[:, -1]
-        entering_var_candidates = np.argwhere(tab_0[:-1] < 0)
-
-        if entering_var_candidates.size == 0:
-            feasible_sol = np.all(tab_1[:, -1] >= 0)
+        try:
+            entering_var = np.argwhere(self.tab[0][:-1] < 0).min()  # use value with smallest index
+        except ValueError:  # all values are positive
+            feasible_sol = np.all(self.tab[1:, -1] >= 0)  # b >= 0
             raise ReachedOptimality if feasible_sol else InfeasibleProblem
+        if not use_blands_rule:
+            entering_var = self.tab[0][:-1].argmin()  # use value that is most negative
 
-        entering_var = (entering_var_candidates.min() if use_blands_rule
-                        else tab_0[:-1].argmin())
-
-        col = tab_1[:, entering_var]
-        positive_col_indices = col > 0
-        ratios = np.divide(tab_1[:, -1], col,
-                           out=np.full(col.shape, np.inf, dtype=float),
-                           where=positive_col_indices)
-        departing_var = ratios.argmin()
-
-        if not use_blands_rule or not positive_col_indices[departing_var]:
-            raise UnboundedProblem
-
+        # minimum ratio test
+        col = self.tab[1:, entering_var]  # column of entering variable
+        ratios = np.divide(self.tab[1:, -1], col, out=np.full_like(col, np.inf, dtype=float), where=col > 0)
+        departing_var = ratios.argmin()  # index of smallest positive value
         if use_blands_rule:
             val = ratios[departing_var]
-            basis_array = np.array(self.basis)
-            departing_var = self.basis.index(np.min(basis_array[ratios == val]))
+            departing_var = self.basis.index(
+                np.min(np.array(self.basis)[ratios == val]))  # smallest index
 
-        self.pivot_idx = (departing_var + 1, entering_var)
+        # if all departing variables are negative
+        if col[departing_var] <= 0:
+            raise UnboundedProblem  # problem in unbounded
+
+        departing_var += 1  # since top of tableau is offset by one
+
+        # pivot index, useful for debugging
+        self.pivot_idx = (departing_var, entering_var)
+
+        # actually pivot
         self._pivot_around(*self.pivot_idx)
 
-
     def _pivot_around(self, r: int, c: int) -> None:
-        
-        # r : index of departing variable
-        # c : index of entering variable
-        
-        # Indices are relative to the tableau; they are not the constraint or variable indices.
+        """
+        Pivots tableau object given a row and column.
+
+        Parameters
+        ----------
+        r : index of departing variable
+        c : index of entering variable
+
+        Notes
+        -----
+        Indices are relative to the tableau; they are not the constraint
+        or variable indices.
+        """
 
         # divide row by pivot
         self.tab[r] /= self.tab[r, c]
 
         # zero out column, except for pivot
-        mask = np.ones(self.tab.shape[0], dtype=bool)
-        mask[r] = False
-        self.tab[mask] -= self.tab[r] * self.tab[mask, c][:, np.newaxis]
-    
+        self.tab -= [self.tab[r] * self.tab[i, c] if i != r else np.zeros_like(self.tab[r])
+                     for i, row in enumerate(self.tab)]
+
     def add_artificial_variables(self):
-        # Inserts artificial columns in tableau and calculates new reduce costs.
+        """
+        Inserts artificial columns in tableau and calculates new reduced
+        costs.
+        """
+
+        # store basis so only single calculation is needed
+        basis = np.array(self.basis)
 
         # calculate new reduced costs
-        new_basic_cost = -(np.array(self.basis) == -1).astype(int)
-        self.tab[0] = np.dot(new_basic_cost, self.tab[:, 1:])
+        new_basic_cost = -1 * (basis == -1)
+        self.tab[0] = [np.dot(new_basic_cost, r[1:]) for r in self.tab.T]
+
+        # identity shifted over so top row is zeroes
+        identity = np.identity(self.shape[0] + 1)[1:]
 
         # add artificial variable columns
-        args = np.where(self.basis == -1)[0]
-        identity = np.eye(self.shape[0])
-        self.artificial_vars = np.arange(self.shape[1], self.shape[1] + len(args))
-        self.tab = np.insert(self.tab, self.tab.shape[1]-1, identity[args], axis=1)
+        args = np.nonzero(basis == -1)[0]
+        self.artificial_vars = range(self.shape[1], self.shape[1] + args.size)  # indices of artificial variables
+        self.tab = np.insert(self.tab, -1, identity[args], axis=1)
 
     def drop_artificial_variables(self):
         """
@@ -251,13 +262,16 @@ class Tableau:
         """
 
         # check basis for artificial vars
-        artificial_vars_mask = np.in1d(self.basis, self.artificial_vars)
-        if np.any(artificial_vars_mask & (self.tab[:, -1] > 0)):
-            raise InfeasibleProblem
+        for var in self.basis:
+            if var in self.artificial_vars:
+                if self.tab[v][-1] > 0:
+                    raise InfeasibleProblem
 
         # drop artificial variables
-        self.tab = np.delete(self.tab, self.artificial_vars, axis=1)
+        drop_cols = self.artificial_vars
+        self.tab = np.delete(self.tab, drop_cols, axis=1)
 
         # calculate new costs
-        costs = self.obj_func[self.basis]
-        self.tab[0] = np.dot(costs, self.tab[:, 1:]) - self.tab[-1, :]
+        costs = [self.obj_func[i] for i in self.basis]
+        self.tab[0] = [np.dot(costs, r[1:]) - c for c, r in
+                       zip(self.obj_func + [0], self.tab.T)]

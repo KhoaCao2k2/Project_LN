@@ -53,10 +53,10 @@ class SimplexSolver:
         self.tableau = Tableau(
             obj_func=obj_func,
             coeffs=coeffs,
-            constraints=constraints,
+            constraints=constraints
         )
 
-    def solve(self, max_iterations=100, use_blands_rule=False, print_tableau=True, No_var = 1):
+    def solve(self, max_iterations=100, use_blands_rule=False, print_tableau=True, No_var=0, check_min = 1, var_none =[]):
         """
         Solves Linear Programming Problem. Returns `Solution` instance`.
 
@@ -70,26 +70,28 @@ class SimplexSolver:
            whether to print the tableau at every iteration
         """
 
+
+
         with self.tableau as t:
             # if incomplete basis, use two-phase method
-            if -1 in t.basis:
-                print("No identifiable basis. Using two-phase method.")
+            # if -1 in t.basis:
+            #     print("No identifiable basis. Using two-phase method.")
 
-                # solve phase 1 problem
-                t.add_artificial_variables()
-                print(f"\nPhase I Tableau:")
-                sol = self.solve(max_iterations=max_iterations)
+            #     # solve phase 1 problem
+            #     t.add_artificial_variables()
+            #     print(f"\nPhase I Tableau:")
+            #     sol = self.solve(max_iterations=max_iterations)
 
-                # if phase I is infeasible
-                if not sol.solution:
-                    return sol
+            #     # if phase I is infeasible
+            #     if not sol.solution:
+            #         return sol
 
-                # begin solving phase II
-                t.drop_artificial_variables()
-                print(f'\nPhase II Tableau:')
+            #     # begin solving phase II
+            #     t.drop_artificial_variables()
+            #     print(f'\nPhase II Tableau:')
 
-            # print starting/phase 2 tableau
-            print(f'{t}\n')
+            # # print starting/phase 2 tableau
+            # print(f'{t}\n')
 
             iterations = 0
             # keep pivoting until exception is raised or max iterations
@@ -108,7 +110,8 @@ class SimplexSolver:
             # if no solution if found
             raise UnsolvableError(max_iterations)
 
-        return Solution(state=t.state, basis=t.basis, No_var = No_var,
+        return Solution(state=t.state, basis=t.basis, No_var = No_var, check_min = check_min, 
+                        var_none = var_none,
                         solution=t.solution, obj_value=t.obj_value)
 
 
@@ -117,8 +120,8 @@ class Solution:
     Converts Tableau parameters into a human-readable solution.
     """
 
-    def __init__(self, state: str, obj_value: float, No_var: int,
-                 basis: List[int], solution: List[float]):
+    def __init__(self, state: str, obj_value: float,No_var : int, check_min: int,
+                 var_none: List[int] ,basis: List[int], solution: List[float]):
         """
         Calculates objective value and basic solution.
 
@@ -126,7 +129,6 @@ class Solution:
         ----------
         state : final state of the tableau
         obj_value : final objective value of tableau
-        No_var : number of variables in the original problem
         basis : indices of the basis variables
         solution : raw solution from tableau
         """
@@ -134,31 +136,33 @@ class Solution:
 
         # objective value
         self.obj_value = {
-            "Optimal": obj_value,
+            "Optimal": obj_value * check_min,
             "Unbounded": np.inf,
             "Infeasible": np.NaN
         }[self.state]
 
         # calculate solution if optimal
         if self.state == "Optimal":
-            self.solution = [0.0] * (No_var)  # start from zero vector
+            self.solution = [0.0] * (max(basis) + 1)  # start from zero vector
             for i, j in zip(basis, solution):
-                if i < No_var:
-                    self.solution[i] = j
+                self.solution[i] = j
+            if len(var_none) != 0:
+                for i in var_none:
+                    self.solution[i] = self.solution[i] + self.solution[i + 1] 
+                for i in var_none:
+                    del self.solution[i+1] 
+            if (len(self.solution) >= No_var):
+                self.solution = self.solution[:No_var]
         else:
             self.solution = None
-
-
+       
     def __repr__(self):
         """
         Returns string representation of solution.
         """
-        if self.state == "Optimal":
-            return f"Solution: z*={self.obj_value}, x*={self.solution}"
-        elif self.state == "Unbounded":
-            return "The problem is unbounded."
-        elif self.state == "Infeasible":
-            return "The problem is infeasible."
-        else:
-            return "No solution has been found yet."
-
+            
+        return 'Solution: ' + {
+            "Optimal": f"z*={self.obj_value}, x*={self.solution}",
+            "Unbounded": "The problem is unbounded.",
+            "Infeasible": "The problem is infeasible."
+        }[self.state]
