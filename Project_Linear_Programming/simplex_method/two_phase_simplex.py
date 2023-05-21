@@ -11,24 +11,39 @@ class two_phase_simplex():
         self.constraint_count = None
         self.list_var = None  
             
-    def get_equations(self):
+    def get_equations(self,user_input):
 
-        self.min_max, self.constraint_count = 'MAX', 2
+        # self.min_max = user_input['objective']
+        # self.constraint_count = len(user_input['coef_constraints'])
+        
+        # equations = list()
+        # RHS = list()
+
+        # # Get objective function
+        # self.var = len(user_input['c_coeff'])
+
+        # equations = np.append(user_input['coef_constraints'], [user_input['c_coeff']], axis=0)
+        # user_input['b_value'].append(0)
+        # RHS = user_input['b_value']
+
+        # self.table = equations
+        # self.RHS = RHS
+        # self.list_var = [(x+self.var) for x in range(self.var)]
+        
+        self.min_max, self.constraint_count = 'MAX', 3
         
         equations = list()
         RHS = list()
 
         # Get objective function
-        self.var = 2
+        self.var = 2r
 
-        equations = [[2,3],[-3,-1],[4,5]]
-        RHS = [6,-3,0]
+        equations = [[-1,-1],[-1,1],[1,2],[1,3]]
+        RHS = [-3,-1,2,0]
 
         self.table = equations
         self.RHS = RHS
-        self.list_var = [(x+self.var) for x in range(self.var)]
-        
-        
+        self.list_var = [(x+self.var) for x in range(self.constraint_count)]
     def pprint(self, table,list_var,pivot_col,pivot_row):
         '''Pretty print a table to check intermediate results'''
         if(pivot_col != -1):
@@ -55,7 +70,7 @@ class two_phase_simplex():
         
         opt_value = self.table[-1][-1]
         
-        if self.min_max == 'MAX':
+        if self.min_max == 'max':
             opt_value *= -1.0
 
         # get values of optimal point
@@ -76,6 +91,8 @@ class two_phase_simplex():
         '''
         # add slack variables
         for eq in self.table:
+            # zeros = np.zeros(self.constraint_count)  # Array of zeros
+            # eq = np.concatenate((eq, zeros))  
             eq.extend([0] * self.constraint_count)
         for i, eq in enumerate(self.table[:-1]):
             if self.RHS[i] < 0:
@@ -85,7 +102,7 @@ class two_phase_simplex():
 
         # convert minimization problem to maximization by changing sign
         self.table = np.array(self.table, dtype=float)
-        if self.min_max == 'MIN':
+        if self.min_max == 'min':
             self.table[-1] = self.table[-1] * -1 + 0.0
 
         self.RHS = np.array(self.RHS)
@@ -206,21 +223,3 @@ class two_phase_simplex():
         opt_point = self.simplex(opt_point)
 
         return self.final_results(opt_point)
-
-
-if __name__ == '__main__':
-    # initialize object
-    simx = two_phase_simplex()
-
-    # get equations and standardize them
-    simx.get_equations()
-    simx.standard_form()
-
-    # call the two-phase simplex method
-    opt_point, opt_value = simx.two_phase()
-
-    # print results
-    print('\nOutput:\n')
-    print('Optimal point is {}'.format(opt_point))
-    print('Optimal value is {}'.format(opt_value))
-

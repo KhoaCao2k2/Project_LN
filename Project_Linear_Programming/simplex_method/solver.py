@@ -56,7 +56,8 @@ class SimplexSolver:
             constraints=constraints
         )
 
-    def solve(self, max_iterations=100, use_blands_rule=False, print_tableau=True, No_var=0, check_min = 1, var_none =[]):
+    def solve(self, max_iterations=100, use_blands_rule=False, print_tableau=True, No_var=0, 
+              check_min = 1, var_none =[], list_Var_positive = []):
         """
         Solves Linear Programming Problem. Returns `Solution` instance`.
 
@@ -111,7 +112,7 @@ class SimplexSolver:
             raise UnsolvableError(max_iterations)
 
         return Solution(state=t.state, basis=t.basis, No_var = No_var, check_min = check_min, 
-                        var_none = var_none,
+                        var_none = var_none,list_Var_positive = list_Var_positive,
                         solution=t.solution, obj_value=t.obj_value)
 
 
@@ -120,7 +121,8 @@ class Solution:
     Converts Tableau parameters into a human-readable solution.
     """
 
-    def __init__(self, state: str, obj_value: float,No_var : int, check_min: int,
+    def __init__(self, state: str, obj_value: float,No_var : int, check_min: int, 
+                 list_Var_positive: List[int],
                  var_none: List[int] ,basis: List[int], solution: List[float]):
         """
         Calculates objective value and basic solution.
@@ -153,6 +155,7 @@ class Solution:
                     del self.solution[i+1] 
             if (len(self.solution) >= No_var):
                 self.solution = self.solution[:No_var]
+                self.solution*=(list_Var_positive) 
         else:
             self.solution = None
        

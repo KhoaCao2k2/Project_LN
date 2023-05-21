@@ -209,7 +209,7 @@ user_inputs[7]= {
     }
 
 #3.15
-user_inputs[7]= {
+user_inputs[2]= {
         'objective': 'max',
         'c_coeff': [3,1,0] ,
         'coef_constraints': [
@@ -367,7 +367,7 @@ user_inputs[12]= {
         
     }
 
-user_inputs[13]= {'objective': 'maximize', 
+user_inputs[13]= {'objective': 'max', 
                   'c_coeff': [1.0, 2.0, 33.0, 3.0, 3.0], 
  'coef_constraints': [[3.0, 3.0, 3.0, 3.0, 3.0], 
                       [3.0, 1.0, 1.0, 1.0, 1.0], 
@@ -433,6 +433,64 @@ user_inputs[15]= {
             [1,0,0],
             [0,1,0],
             [0,0,1]
+        ],
+        
+        'inequality_inequality_constraints':[
+            '>=', '>=','>='
+        ],
+        
+    }
+
+
+#1.10a
+user_inputs[16]= {
+        'objective': 'min',
+        'c_coeff': [-1,1] ,
+        'coef_constraints': [
+            [-1,-2],
+            [1,-2],
+            [-1,1],  
+        ],
+        'inequality_constraints': [
+            '<=','<=','<='
+        ],
+        'b_value': [6,4,1],
+        
+        
+        'coef_inequality_constraints':[
+            [1,0],
+            [0,1],
+            
+        ],
+        
+        'inequality_inequality_constraints':[
+            '<=', '<='
+        ],
+        
+    }
+
+
+
+
+#1.17a
+user_inputs[17]= {
+        'objective': 'max',
+        'c_coeff': [1,3,2] ,
+        'coef_constraints': [
+            [1,1,1],
+            [7,2,3],
+            [1,5,4],  
+        ],
+        'inequality_constraints': [
+            '=','<=','<='
+        ],
+        'b_value': [1,20,30],
+        
+        
+        'coef_inequality_constraints':[
+            [1,0,0],
+            [0,1,0],
+            [0,0,1],
         ],
         
         'inequality_inequality_constraints':[

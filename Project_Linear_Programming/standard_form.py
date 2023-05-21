@@ -60,10 +60,13 @@ def standard_form(user_inputs):
         i+= 1 
         j+= 1
     k = 0
+    list_var_positive = np.ones(n)
     for j in range(n):
         #tranfer <= to =>
         if inequality_inequality_constraints[j] == '<=':
-            A[:,j] = A[:,j]*-1
+            A[:,k] = A[:,k]*-1
+            c_coeff[k] *= -1
+            list_var_positive[j] = -1
         #tranfer x = u - v if x don't have constraint
         elif inequality_inequality_constraints[j] == 'None':
             A = np.insert(A, k +1, A[:,k]*-1, axis=1)
@@ -80,5 +83,5 @@ def standard_form(user_inputs):
     conversion['No_con'] = m
     conversion['n_slack'] = n_slack
     conversion['var_none'] = var_none
-
+    conversion['list_Var_positive'] = list_var_positive
     return conversion
